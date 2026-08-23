@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Crear Admin - EET N°3</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
+    h1 { color: #1e40af; }
+    label { display: block; margin: 15px 0 5px; font-weight: bold; }
+    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    button { margin-top: 20px; padding: 12px 24px; background: #1e40af; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; }
+    button:hover { background: #1e3a8a; }
+    #result { margin-top: 20px; padding: 15px; border-radius: 6px; }
+    .success { background: #d1fae5; color: #065f46; }
+    .error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <h1>🏫 EET N°3 - Crear Administrador</h1>
+  <p>Use este formulario una sola vez para crear el primer usuario administrador.</p>
+  
+  <label>Email:</label>
+  <input type="email" id="email" value="admin@escuela3.edu.ar">
+  
+  <label>Contraseña (mínimo 6 caracteres):</label>
+  <input type="password" id="password" value="Admin123!">
+  
+  <label>Nombre completo:</label>
+  <input type="text" id="fullName" value="Administrador">
+  
+  <button onclick="createAdmin()">Crear Administrador</button>
+  
+  <div id="result"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://cyygrtannnvchyqhffrh.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5eWdydGFubm52Y2h5cWhmZnJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMDE3ODUsImV4cCI6MjEwMjg3Nzc4NX0.gfKLJFXlJYoLCiOgc_tNzhokg545FNpPhGSvIQnSa-w';
+    
+    const { createClient } = supabase;
+    const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function createAdmin() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const fullName = document.getElementById('fullName').value;
+      const resultDiv = document.getElementById('result');
+
+      try {
+        const { data, error } = await client.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: 'admin'
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        resultDiv.className = 'success';
+        resultDiv.innerHTML = '<strong>✅ Administrador creado exitosamente!</strong><br><br>' +
+          '<b>Email:</b> ' + email + '<br>' +
+          '<b>Nombre:</b> ' + fullName + '<br><br>' +
+          'Ahora puede iniciar sesión en la aplicación.<br>' +
+          '<small>Nota: Si Supabase tiene confirmación de email habilitada, desactívela desde el panel de Supabase (Authentication > Providers > Email > Confirm email = OFF).</small>';
+      } catch (err) {
+        resultDiv.className = 'error';
+        resultDiv.innerHTML = '<strong>❌ Error:</strong> ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "institution": "ESCUELA DE EDUCACIÓN SECUNDARIA TÉCNICA N° 3 \"Ntra. Sra. de la Merced\"",
+  "shift_code": "vespertino",
+  "shift_name": "Turno Vespertino",
+  "location": "LOMA HERMOSA",
+  "courses": [
+    { "id": "course-tv-1", "name": "5° 4ª", "year": 5, "division": 4, "cycle": "superior", "orientation": "TECET", "inscriptos_v": 8, "inscriptos_m": 0, "inscriptos_t": 8, "sample_presentes_v": 7, "sample_presentes_m": 0, "sample_obs": "" },
+    { "id": "course-tv-2", "name": "6° 1ª", "year": 6, "division": 1, "cycle": "superior", "orientation": "TECQU", "inscriptos_v": 11, "inscriptos_m": 4, "inscriptos_t": 15, "sample_presentes_v": 10, "sample_presentes_m": 4, "sample_obs": "3 alumnos en laboratorio de química" },
+    { "id": "course-tv-3", "name": "6° 2ª", "year": 6, "division": 2, "cycle": "superior", "orientation": "TECMM", "inscriptos_v": 9, "inscriptos_m": 14, "inscriptos_t": 23, "sample_presentes_v": 8, "sample_presentes_m": 12, "sample_obs": "" },
+    { "id": "course-tv-4", "name": "6° 3ª", "year": 6, "division": 3, "cycle": "superior", "orientation": "TECET", "inscriptos_v": 23, "inscriptos_m": 2, "inscriptos_t": 25, "sample_presentes_v": 21, "sample_presentes_m": 2, "sample_obs": "Taller electromecánico normal" },
+    { "id": "course-tv-5", "name": "6° 4ª", "year": 6, "division": 4, "cycle": "superior", "orientation": "TECET", "inscriptos_v": 6, "inscriptos_m": 0, "inscriptos_t": 6, "sample_presentes_v": 5, "sample_presentes_m": 0, "sample_obs": "" },
+    { "id": "course-tv-6", "name": "7° 1ª", "year": 7, "division": 1, "cycle": "superior", "orientation": "TECQU", "inscriptos_v": 5, "inscriptos_m": 8, "inscriptos_t": 13, "sample_presentes_v": 4, "sample_presentes_m": 8, "sample_obs": "Práctica profesionalizante" },
+    { "id": "course-tv-7", "name": "7° 2ª", "year": 7, "division": 2, "cycle": "superior", "orientation": "TECMM", "inscriptos_v": 9, "inscriptos_m": 9, "inscriptos_t": 18, "sample_presentes_v": 8, "sample_presentes_m": 8, "sample_obs": "" },
+    { "id": "course-tv-8", "name": "7° 3ª", "year": 7, "division": 3, "cycle": "superior", "orientation": "TECET", "inscriptos_v": 20, "inscriptos_m": 9, "inscriptos_t": 29, "sample_presentes_v": 18, "sample_presentes_m": 8, "sample_obs": "" },
+    { "id": "course-tv-9", "name": "7° 4ª", "year": 7, "division": 4, "cycle": "superior", "orientation": "TECET", "inscriptos_v": 8, "inscriptos_m": 0, "inscriptos_t": 8, "sample_presentes_v": 8, "sample_presentes_m": 0, "sample_obs": "Asistencia perfecta" },
+    { "id": "course-tv-10", "name": "1° 1ª C.TEC.MMO", "year": 1, "division": 1, "cycle": "tecnico_especial", "orientation": "C.TEC.MMO", "inscriptos_v": 20, "inscriptos_m": 7, "inscriptos_t": 27, "sample_presentes_v": 18, "sample_presentes_m": 6, "sample_obs": "" }
+  ],
+  "totals": {
+    "inscriptos_v": 119,
+    "inscriptos_m": 53,
+    "inscriptos_t": 172
+  }
+}

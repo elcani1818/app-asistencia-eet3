@@ -1,0 +1,23 @@
+﻿# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor
+.vscode/*
+.idea
+.DS_Store
+
+# Env
+.env
+.env.*
+!.env.example
+
+mingit/
+mingit.zip

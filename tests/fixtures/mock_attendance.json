@@ -1,0 +1,51 @@
+{
+  "date": "2026-08-20",
+  "vespertino_full_submission": [
+    { "course_id": "course-tv-1", "course_name": "5° 4ª", "presentes_v": 7, "ausentes_v": 1, "presentes_m": 0, "ausentes_m": 0, "observaciones": "" },
+    { "course_id": "course-tv-2", "course_name": "6° 1ª", "presentes_v": 10, "ausentes_v": 1, "presentes_m": 4, "ausentes_m": 0, "observaciones": "3 alumnos en laboratorio de química" },
+    { "course_id": "course-tv-3", "course_name": "6° 2ª", "presentes_v": 8, "ausentes_v": 1, "presentes_m": 12, "ausentes_m": 2, "observaciones": "" },
+    { "course_id": "course-tv-4", "course_name": "6° 3ª", "presentes_v": 21, "ausentes_v": 2, "presentes_m": 2, "ausentes_m": 0, "observaciones": "Taller electromecánico normal" },
+    { "course_id": "course-tv-5", "course_name": "6° 4ª", "presentes_v": 5, "ausentes_v": 1, "presentes_m": 0, "ausentes_m": 0, "observaciones": "" },
+    { "course_id": "course-tv-6", "course_name": "7° 1ª", "presentes_v": 4, "ausentes_v": 1, "presentes_m": 8, "ausentes_m": 0, "observaciones": "Práctica profesionalizante" },
+    { "course_id": "course-tv-7", "course_name": "7° 2ª", "presentes_v": 8, "ausentes_v": 1, "presentes_m": 8, "ausentes_m": 1, "observaciones": "" },
+    { "course_id": "course-tv-8", "course_name": "7° 3ª", "presentes_v": 18, "ausentes_v": 2, "presentes_m": 8, "ausentes_m": 1, "observaciones": "" },
+    { "course_id": "course-tv-9", "course_name": "7° 4ª", "presentes_v": 8, "ausentes_v": 0, "presentes_m": 0, "ausentes_m": 0, "observaciones": "Asistencia perfecta" },
+    { "course_id": "course-tv-10", "course_name": "1° 1ª C.TEC.MMO", "presentes_v": 18, "ausentes_v": 2, "presentes_m": 6, "ausentes_m": 1, "observaciones": "" }
+  ],
+  "vespertino_totals": {
+    "inscriptos_v": 119,
+    "inscriptos_m": 53,
+    "inscriptos_t": 172,
+    "presentes_v": 107,
+    "presentes_m": 48,
+    "presentes_t": 155,
+    "ausentes_v": 12,
+    "ausentes_m": 5,
+    "ausentes_t": 17,
+    "porcentaje_asistencia": 90.12
+  },
+  "staff_absences": [
+    {
+      "id": "staff-abs-1",
+      "shift_id": "shift-tv",
+      "shift_code": "vespertino",
+      "staff_name": "Prof. Gómez Carlos",
+      "role_type": "Docente",
+      "subject_or_area": "Química Analítica",
+      "reason": "Licencia médica Art. 114 a-1",
+      "observations": "Deja trabajo práctico en fotocopiadora",
+      "created_by": "precep-tv"
+    },
+    {
+      "id": "staff-abs-2",
+      "shift_id": "shift-tm",
+      "shift_code": "manana",
+      "staff_name": "Rodríguez María",
+      "role_type": "Auxiliar",
+      "subject_or_area": "Portería / Mantenimiento",
+      "reason": "Fuerza mayor",
+      "observations": "Aviso telefónico 06:45",
+      "created_by": "precep-tm"
+    }
+  ]
+}

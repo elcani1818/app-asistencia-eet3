@@ -1,0 +1,76 @@
+{
+  "users": [
+    {
+      "id": "admin-1",
+      "email": "admin@eest3.edu.ar",
+      "full_name": "Director General",
+      "role": "administrador",
+      "dni": "20123456",
+      "is_active": true,
+      "assigned_course_ids": []
+    },
+    {
+      "id": "precep-tm",
+      "email": "preceptor.tm@eest3.edu.ar",
+      "full_name": "Preceptor Turno Mañana",
+      "role": "preceptor",
+      "dni": "22345678",
+      "is_active": true,
+      "assigned_course_ids": []
+    },
+    {
+      "id": "precep-tt",
+      "email": "preceptor.tt@eest3.edu.ar",
+      "full_name": "Preceptor Turno Tarde",
+      "role": "preceptor",
+      "dni": "23456789",
+      "is_active": true,
+      "assigned_course_ids": []
+    },
+    {
+      "id": "precep-tv",
+      "email": "preceptor.tv@eest3.edu.ar",
+      "full_name": "Preceptor Turno Vespertino",
+      "role": "preceptor",
+      "dni": "24567890",
+      "is_active": true,
+      "assigned_course_ids": []
+    },
+    {
+      "id": "prof-quimica",
+      "email": "prof.quimica@eest3.edu.ar",
+      "full_name": "Prof. Roberto Química",
+      "role": "profesor",
+      "dni": "25678901",
+      "is_active": true,
+      "assigned_course_ids": ["course-tv-2", "course-tv-6", "course-tm-8"]
+    },
+    {
+      "id": "prof-electrom",
+      "email": "prof.electrom@eest3.edu.ar",
+      "full_name": "Prof. Carlos Electromecánica",
+      "role": "profesor",
+      "dni": "26789012",
+      "is_active": true,
+      "assigned_course_ids": ["course-tv-1", "course-tv-4", "course-tv-5", "course-tv-8", "course-tv-9"]
+    },
+    {
+      "id": "prof-construc",
+      "email": "prof.construc@eest3.edu.ar",
+      "full_name": "Prof. Laura Construcciones",
+      "role": "profesor",
+      "dni": "27890123",
+      "is_active": true,
+      "assigned_course_ids": ["course-tv-3", "course-tv-7", "course-tv-10"]
+    },
+    {
+      "id": "prof-inactivo",
+      "email": "prof.inactivo@eest3.edu.ar",
+      "full_name": "Prof. Desactivado",
+      "role": "profesor",
+      "dni": "28901234",
+      "is_active": false,
+      "assigned_course_ids": []
+    }
+  ]
+}

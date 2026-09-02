@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Profile, Course, Shift, Orientation } from '../lib/types';
-import { Users, BookOpen, Layers, Plus, Trash2, Pencil, X, Check } from 'lucide-react';
+import { Users, BookOpen, Layers, Plus, Trash2, Pencil, X, Check, Sparkles } from 'lucide-react';
+
+interface ExtendedCourse extends Course {
+  shifts?: Shift;
+  orientations?: Orientation;
+}
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'assignments' | 'courses'>('users');
   
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [courses, setCourses] = useState<(Course & { shifts: Shift, orientations: Orientation })[]>([]);
+  const [courses, setCourses] = useState<ExtendedCourse[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [orientations, setOrientations] = useState<Orientation[]>([]);
   const [preceptors, setPreceptors] = useState<Profile[]>([]);
   
   const [selectedProf, setSelectedProf] = useState<string>('');
@@ -16,14 +23,33 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: '', type: '' });
 
-  // Create user form
+  // ---- USER STATE ----
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '' });
   const [creating, setCreating] = useState(false);
 
-  // Edit user
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState({ full_name: '', role: '' });
+
+  // ---- COURSE STATE ----
+  const [courseShiftFilter, setCourseShiftFilter] = useState<string>('all');
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [savingCourse, setSavingCourse] = useState(false);
+  const [seedingBasico, setSeedingBasico] = useState(false);
+
+  const initialCourseForm = {
+    year: 1,
+    division: 1,
+    display_name: '1° 1ª',
+    shift_id: '',
+    orientation_id: '',
+    inscriptos_v: 0,
+    inscriptos_m: 0,
+    cycle: 'basico' as 'basico' | 'superior' | 'tecnico',
+    is_active: true
+  };
+  const [courseForm, setCourseForm] = useState(initialCourseForm);
 
   useEffect(() => {
     fetchData();
@@ -32,15 +58,29 @@ const AdminPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // 1. Profiles
       const { data: pData } = await supabase.from('profiles').select('*').order('full_name');
       if (pData) {
         setProfiles(pData as Profile[]);
         setPreceptors(pData.filter(p => p.role === 'preceptor' || p.role === 'admin'));
       }
 
+      // 2. Shifts
+      const { data: sData } = await supabase.from('shifts').select('*').order('display_order');
+      if (sData) {
+        setShifts(sData as Shift[]);
+      }
+
+      // 3. Orientations
+      const { data: oData } = await supabase.from('orientations').select('*').order('code');
+      if (oData) {
+        setOrientations(oData as Orientation[]);
+      }
+
+      // 4. Courses
       const { data: cData } = await supabase
         .from('courses')
-        .select(`*, shifts(name), orientations(code)`)
+        .select(`*, shifts(id, name, display_order), orientations(id, code, full_name)`)
         .order('year')
         .order('division');
       if (cData) setCourses(cData as any);
@@ -51,7 +91,39 @@ const AdminPanel = () => {
     }
   };
 
-  // ---- CREATE USER ----
+  // Helper: Suggest orientation & cycle based on year and division
+  const getSmartCourseDefaults = (year: number, division: number, currentOrientations: Orientation[]) => {
+    const cb = currentOrientations.find(o => o.code === 'CB');
+    const tecqu = currentOrientations.find(o => o.code === 'TECQU');
+    const tecmm = currentOrientations.find(o => o.code === 'TECMM');
+    const tecet = currentOrientations.find(o => o.code === 'TECET');
+
+    let suggestedOrientationId = cb?.id || '';
+    let suggestedCycle: 'basico' | 'superior' | 'tecnico' = 'basico';
+    let suggestedName = `${year}° ${division}ª`;
+
+    if (year <= 3) {
+      suggestedCycle = 'basico';
+      suggestedOrientationId = cb?.id || '';
+    } else {
+      suggestedCycle = 'superior';
+      if (division === 1) {
+        suggestedOrientationId = tecqu?.id || '';
+      } else if (division === 2) {
+        suggestedOrientationId = tecmm?.id || '';
+      } else if (division === 3 || division === 4) {
+        suggestedOrientationId = tecet?.id || '';
+      }
+    }
+
+    return {
+      suggestedOrientationId,
+      suggestedCycle,
+      suggestedName
+    };
+  };
+
+  // ==================== USER HANDLERS ====================
   const handleCreateUser = async () => {
     if (!newUser.email || !newUser.password || !newUser.full_name) {
       showMessage('Complete todos los campos', 'error');
@@ -81,7 +153,6 @@ const AdminPanel = () => {
     }
   };
 
-  // ---- EDIT USER ----
   const startEdit = (p: Profile) => {
     setEditingId(p.id);
     setEditData({ full_name: p.full_name, role: p.role });
@@ -107,8 +178,7 @@ const AdminPanel = () => {
     }
   };
 
-  // ---- DELETE USER ----
-  const handleDelete = async (userId: string, name: string) => {
+  const handleDeleteUser = async (userId: string, name: string) => {
     if (!confirm(`¿Está seguro de eliminar al usuario "${name}"? Esta acción no se puede deshacer.`)) return;
     try {
       const { error } = await supabase.rpc('admin_delete_user', { p_user_id: userId });
@@ -120,7 +190,7 @@ const AdminPanel = () => {
     }
   };
 
-  // ---- ASSIGNMENTS ----
+  // ==================== ASSIGNMENT HANDLERS ====================
   const loadAssignments = async (profId: string) => {
     setSelectedProf(profId);
     if (!profId) {
@@ -155,10 +225,155 @@ const AdminPanel = () => {
     }
   };
 
+  // ==================== COURSE HANDLERS ====================
+  const openNewCourseModal = () => {
+    const defaultShiftId = shifts[0]?.id || '';
+    const defaults = getSmartCourseDefaults(1, 1, orientations);
+    setCourseForm({
+      year: 1,
+      division: 1,
+      display_name: defaults.suggestedName,
+      shift_id: defaultShiftId,
+      orientation_id: defaults.suggestedOrientationId,
+      inscriptos_v: 0,
+      inscriptos_m: 0,
+      cycle: defaults.suggestedCycle,
+      is_active: true
+    });
+    setEditingCourseId(null);
+    setShowCourseModal(true);
+  };
+
+  const openEditCourseModal = (course: ExtendedCourse) => {
+    setEditingCourseId(course.id);
+    setCourseForm({
+      year: course.year,
+      division: course.division,
+      display_name: course.display_name,
+      shift_id: course.shift_id,
+      orientation_id: course.orientation_id,
+      inscriptos_v: course.inscriptos_v,
+      inscriptos_m: course.inscriptos_m,
+      cycle: course.cycle,
+      is_active: course.is_active
+    });
+    setShowCourseModal(true);
+  };
+
+  const handleYearChange = (yearNum: number) => {
+    const defaults = getSmartCourseDefaults(yearNum, courseForm.division, orientations);
+    setCourseForm(prev => ({
+      ...prev,
+      year: yearNum,
+      display_name: defaults.suggestedName,
+      orientation_id: defaults.suggestedOrientationId,
+      cycle: defaults.suggestedCycle
+    }));
+  };
+
+  const handleDivisionChange = (divNum: number) => {
+    const defaults = getSmartCourseDefaults(courseForm.year, divNum, orientations);
+    setCourseForm(prev => ({
+      ...prev,
+      division: divNum,
+      display_name: defaults.suggestedName,
+      orientation_id: defaults.suggestedOrientationId,
+      cycle: defaults.suggestedCycle
+    }));
+  };
+
+  const handleSaveCourse = async () => {
+    if (!courseForm.shift_id || !courseForm.orientation_id || !courseForm.display_name) {
+      showMessage('Complete el turno, la orientación y el nombre del curso', 'error');
+      return;
+    }
+
+    setSavingCourse(true);
+    try {
+      if (editingCourseId) {
+        // Update
+        const { error } = await supabase.rpc('admin_update_course', {
+          p_course_id: editingCourseId,
+          p_year: courseForm.year,
+          p_division: courseForm.division,
+          p_display_name: courseForm.display_name,
+          p_shift_id: courseForm.shift_id,
+          p_orientation_id: courseForm.orientation_id,
+          p_inscriptos_v: courseForm.inscriptos_v,
+          p_inscriptos_m: courseForm.inscriptos_m,
+          p_cycle: courseForm.cycle,
+          p_is_active: courseForm.is_active
+        });
+        if (error) throw error;
+        showMessage('Curso actualizado correctamente', 'success');
+      } else {
+        // Create
+        const { error } = await supabase.rpc('admin_create_course', {
+          p_year: courseForm.year,
+          p_division: courseForm.division,
+          p_display_name: courseForm.display_name,
+          p_shift_id: courseForm.shift_id,
+          p_orientation_id: courseForm.orientation_id,
+          p_inscriptos_v: courseForm.inscriptos_v,
+          p_inscriptos_m: courseForm.inscriptos_m,
+          p_cycle: courseForm.cycle
+        });
+        if (error) throw error;
+        showMessage('Curso creado con éxito', 'success');
+      }
+
+      setShowCourseModal(false);
+      fetchData();
+    } catch (e: any) {
+      showMessage(e.message || 'Error al guardar curso', 'error');
+    } finally {
+      setSavingCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string, displayName: string) => {
+    if (!confirm(`¿Está seguro de eliminar el curso "${displayName}"? Se borrarán sus asistencias y asignaciones vinculadas.`)) return;
+    try {
+      const { error } = await supabase.rpc('admin_delete_course', { p_course_id: courseId });
+      if (error) throw error;
+      showMessage(`Curso "${displayName}" eliminado`, 'success');
+      fetchData();
+    } catch (e: any) {
+      showMessage(e.message || 'Error al eliminar curso', 'error');
+    }
+  };
+
+  const handleSeedCicloBasico = async () => {
+    const targetShiftId = courseShiftFilter !== 'all' ? courseShiftFilter : shifts[0]?.id;
+    const targetShiftName = shifts.find(s => s.id === targetShiftId)?.name || 'seleccionado';
+    
+    if (!confirm(`¿Desea crear automáticamente los 14 cursos del Ciclo Básico (1°1ª a 1°5ª, 2°1ª a 2°5ª, 3°1ª a 3°4ª) en el Turno ${targetShiftName}? Los que ya existan no se duplicarán.`)) {
+      return;
+    }
+
+    setSeedingBasico(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_seed_ciclo_basico', { p_shift_id: targetShiftId });
+      if (error) throw error;
+      showMessage(`Se agregaron ${data} cursos de Ciclo Básico en Turno ${targetShiftName}`, 'success');
+      fetchData();
+    } catch (e: any) {
+      showMessage(e.message || 'Error al precargar cursos', 'error');
+    } finally {
+      setSeedingBasico(false);
+    }
+  };
+
   const showMessage = (text: string, type: string) => {
     setMsg({ text, type });
     setTimeout(() => setMsg({ text: '', type: '' }), 4000);
   };
+
+  // Filter courses based on shift tab
+  const filteredCourses = courses.filter(c => {
+    if (courseShiftFilter === 'all') return true;
+    return c.shift_id === courseShiftFilter;
+  });
 
   return (
     <div className="bg-white rounded-xl shadow border border-gray-200">
@@ -172,6 +387,7 @@ const AdminPanel = () => {
         </div>
       )}
 
+      {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('users')}
@@ -194,13 +410,15 @@ const AdminPanel = () => {
       </div>
 
       <div className="p-6">
-        {loading && <p>Cargando datos...</p>}
+        {loading && <p className="text-gray-500 text-center py-6">Cargando datos...</p>}
 
+        {/* ========================================================================= */}
         {/* ======== TAB USUARIOS ======== */}
+        {/* ========================================================================= */}
         {activeTab === 'users' && !loading && (
           <div className="space-y-6">
-            {/* Botón crear */}
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-500">Gestión de cuentas para preceptores y administradores.</p>
               <button
                 onClick={() => setShowCreateForm(!showCreateForm)}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm"
@@ -210,7 +428,6 @@ const AdminPanel = () => {
               </button>
             </div>
 
-            {/* Formulario crear */}
             {showCreateForm && (
               <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 space-y-4">
                 <h3 className="font-semibold text-blue-900 text-lg">Nuevo Usuario (Preceptor)</h3>
@@ -264,7 +481,6 @@ const AdminPanel = () => {
               </div>
             )}
 
-            {/* Tabla usuarios */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -322,7 +538,7 @@ const AdminPanel = () => {
                             <button onClick={() => startEdit(p)} className="text-blue-600 hover:text-blue-800 p-1" title="Editar">
                               <Pencil className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleDelete(p.id, p.full_name)} className="text-red-600 hover:text-red-800 p-1" title="Eliminar">
+                            <button onClick={() => handleDeleteUser(p.id, p.full_name)} className="text-red-600 hover:text-red-800 p-1" title="Eliminar">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -336,7 +552,9 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {/* ========================================================================= */}
         {/* ======== TAB ASIGNACIONES ======== */}
+        {/* ========================================================================= */}
         {activeTab === 'assignments' && !loading && (
           <div className="space-y-6">
             <div>
@@ -355,7 +573,7 @@ const AdminPanel = () => {
 
             {selectedProf && (
               <div>
-                <h3 className="font-semibold text-lg mb-3">Cursos disponibles</h3>
+                <h3 className="font-semibold text-lg mb-3">Cursos disponibles para asignar</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {courses.map(c => (
                     <label key={c.id} className="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
@@ -381,30 +599,297 @@ const AdminPanel = () => {
           </div>
         )}
 
+        {/* ========================================================================= */}
         {/* ======== TAB CURSOS ======== */}
+        {/* ========================================================================= */}
         {activeTab === 'courses' && !loading && (
-          <div>
-            <div className="overflow-x-auto">
+          <div className="space-y-6">
+            {/* Header with Shift Filter & Actions */}
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 pb-4 border-b border-gray-200">
+              {/* Turnos tabs */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setCourseShiftFilter('all')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${courseShiftFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  Todos ({courses.length})
+                </button>
+                {shifts.map(s => {
+                  const count = courses.filter(c => c.shift_id === s.id).length;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setCourseShiftFilter(s.id)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${courseShiftFilter === s.id ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                      Turno {s.name} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleSeedCicloBasico}
+                  disabled={seedingBasico}
+                  title="Genera automáticamente 1°1ª a 1°5ª, 2°1ª a 2°5ª, 3°1ª a 3°4ª para el turno seleccionado"
+                  className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium text-sm transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 mr-1.5 text-indigo-600" />
+                  {seedingBasico ? 'Generando...' : 'Precargar Ciclo Básico (1° a 3°)'}
+                </button>
+                <button
+                  onClick={openNewCourseModal}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Curso
+                </button>
+              </div>
+            </div>
+
+            {/* Modal / Formulario de Creación / Edición */}
+            {showCourseModal && (
+              <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 space-y-4 shadow-sm">
+                <div className="flex justify-between items-center border-b border-blue-200 pb-3">
+                  <h3 className="font-bold text-blue-950 text-lg">
+                    {editingCourseId ? 'Editar Curso' : 'Crear Nuevo Curso'}
+                  </h3>
+                  <button
+                    onClick={() => setShowCourseModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {/* Año */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Año</label>
+                    <select
+                      value={courseForm.year}
+                      onChange={e => handleYearChange(parseInt(e.target.value))}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map(y => (
+                        <option key={y} value={y}>{y}° Año</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* División */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">División</label>
+                    <select
+                      value={courseForm.division}
+                      onChange={e => handleDivisionChange(parseInt(e.target.value))}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map(d => (
+                        <option key={d} value={d}>{d}ª División</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Turno */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Turno</label>
+                    <select
+                      value={courseForm.shift_id}
+                      onChange={e => setCourseForm({ ...courseForm, shift_id: e.target.value })}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    >
+                      <option value="">Seleccionar Turno...</option>
+                      {shifts.map(s => (
+                        <option key={s.id} value={s.id}>Turno {s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Orientación */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Orientación</label>
+                    <select
+                      value={courseForm.orientation_id}
+                      onChange={e => {
+                        const selectedO = orientations.find(o => o.id === e.target.value);
+                        setCourseForm(prev => ({
+                          ...prev,
+                          orientation_id: e.target.value,
+                          cycle: selectedO?.code === 'CB' ? 'basico' : (selectedO?.code === 'C.TEC.MMO' ? 'tecnico' : 'superior')
+                        }));
+                      }}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
+                    >
+                      <option value="">Seleccionar Orientación...</option>
+                      {orientations.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.code} - {o.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Nombre a mostrar */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Nombre Visible</label>
+                    <input
+                      type="text"
+                      value={courseForm.display_name}
+                      onChange={e => setCourseForm({ ...courseForm, display_name: e.target.value })}
+                      placeholder="Ej: 1° 1ª"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm font-semibold text-gray-800"
+                    />
+                  </div>
+
+                  {/* Inscriptos Varones */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Inscriptos Varones (V)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={courseForm.inscriptos_v}
+                      onChange={e => setCourseForm({ ...courseForm, inscriptos_v: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm text-center font-medium"
+                    />
+                  </div>
+
+                  {/* Inscriptos Mujeres */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Inscriptos Mujeres (M)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={courseForm.inscriptos_m}
+                      onChange={e => setCourseForm({ ...courseForm, inscriptos_m: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-blue-500 focus:border-blue-500 text-sm text-center font-medium"
+                    />
+                  </div>
+
+                  {/* Total Inscriptos (Preview) */}
+                  <div className="flex flex-col justify-end">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Total Inscriptos (T)</label>
+                    <div className="p-2.5 bg-gray-100 border border-gray-200 rounded-lg text-center font-bold text-blue-900 text-sm">
+                      {courseForm.inscriptos_v + courseForm.inscriptos_m} alumnos
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-blue-200">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="courseActive"
+                      checked={courseForm.is_active}
+                      onChange={e => setCourseForm({ ...courseForm, is_active: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="courseActive" className="text-sm font-medium text-gray-700">
+                      Curso activo en el sistema
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowCourseModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveCourse}
+                      disabled={savingCourse}
+                      className="px-5 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 font-medium text-sm shadow transition-colors disabled:opacity-50"
+                    >
+                      {savingCourse ? 'Guardando...' : (editingCourseId ? 'Actualizar Curso' : 'Crear Curso')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Courses Table */}
+            <div className="overflow-x-auto shadow-sm ring-1 ring-black ring-opacity-5 rounded-lg">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Curso</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turno</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orientación</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Inscriptos (V/M/T)</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Curso</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Turno</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Orientación</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Ciclo</th>
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Inscriptos (V / M / T)</th>
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {courses.map(c => (
-                    <tr key={c.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.display_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.shifts?.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.orientations?.code}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
-                        {c.inscriptos_v} / {c.inscriptos_m} / <span className="font-bold">{c.inscriptos_t}</span>
+                  {filteredCourses.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-500 italic">
+                        No hay cursos registrados para este turno. Haz clic en <strong>"Nuevo Curso"</strong> o <strong>"Precargar Ciclo Básico"</strong> para agregar.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredCourses.map((c, idx) => (
+                      <tr key={c.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {c.display_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
+                            {c.shifts?.name || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                          <span className="text-blue-700 font-bold mr-1">{c.orientations?.code}</span>
+                          <span className="text-xs text-gray-500 hidden sm:inline">({c.orientations?.full_name})</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500 capitalize">
+                          {c.cycle}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-600">
+                          <span className="text-gray-700">{c.inscriptos_v}</span>
+                          <span className="text-gray-400 mx-1">/</span>
+                          <span className="text-gray-700">{c.inscriptos_m}</span>
+                          <span className="text-gray-400 mx-1">/</span>
+                          <span className="font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                            {c.inscriptos_t}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-xs">
+                          {c.is_active ? (
+                            <span className="px-2.5 py-1 rounded-full font-bold bg-green-100 text-green-800">
+                              Activo
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full font-bold bg-gray-100 text-gray-600">
+                              Inactivo
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => openEditCourseModal(c)}
+                              className="text-blue-600 hover:text-blue-900 p-1.5 rounded hover:bg-blue-50 transition-colors"
+                              title="Editar curso e inscriptos"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCourse(c.id, c.display_name)}
+                              className="text-red-600 hover:text-red-900 p-1.5 rounded hover:bg-red-50 transition-colors"
+                              title="Eliminar curso"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

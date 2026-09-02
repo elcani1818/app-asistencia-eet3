@@ -15,7 +15,7 @@ const RootRedirect = () => {
   if (loading) return <div>Cargando...</div>;
   if (!profile) return <Navigate to="/login" replace />;
   
-  if (profile.role === 'profesor') {
+  if (profile.role === 'preceptor') {
     return <Navigate to="/asistencia" replace />;
   }
   return <Navigate to="/dashboard" replace />;
@@ -31,7 +31,7 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<RootRedirect />} />
             
-            <Route element={<ProtectedRoute allowedRoles={['admin', 'profesor']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'preceptor']} />}>
               <Route path="/asistencia" element={<AttendanceForm />} />
             </Route>
             

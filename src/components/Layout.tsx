@@ -28,10 +28,10 @@ const Layout = () => {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="font-bold text-xl">EET N°3 - Asistencia</span>
+                <span className="font-bold text-xl">E.E.S.T. N° 3</span>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                {profile?.role === 'profesor' || profile?.role === 'admin' ? (
+                {profile?.role === 'preceptor' || profile?.role === 'admin' ? (
                   <Link
                     to="/asistencia"
                     className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent hover:border-white text-sm font-medium"
@@ -96,7 +96,7 @@ const Layout = () => {
         {isMobileMenuOpen && (
           <div className="sm:hidden bg-blue-700">
             <div className="pt-2 pb-3 space-y-1">
-              {profile?.role === 'profesor' || profile?.role === 'admin' ? (
+              {profile?.role === 'preceptor' || profile?.role === 'admin' ? (
                 <Link
                   to="/asistencia"
                   onClick={closeMobileMenu}

@@ -54,7 +54,7 @@ const Login = () => {
             <BookOpen className="h-10 w-10 text-blue-700" />
           </div>
           <h2 className="mt-2 text-3xl font-extrabold text-gray-900">
-            EET N°3
+            E.E.S.T. N° 3
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Sistema de Gestión de Asistencia

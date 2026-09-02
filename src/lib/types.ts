@@ -29,7 +29,7 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'preceptor' | 'profesor';
+  role: 'admin' | 'preceptor';
   is_active: boolean;
 }
 

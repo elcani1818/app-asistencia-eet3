@@ -386,6 +386,115 @@ const AdminPanel = () => {
     }
   };
 
+  // Cursos oficiales Turno Tarde (según Parte General)
+  const OFFICIAL_TARDE_COURSES = [
+    { year: 1, division: 3, display_name: '1° 3°', inscriptos_v: 16, inscriptos_m: 11, orientation_code: 'CB', cycle: 'basico' as const },
+    { year: 1, division: 4, display_name: '1° 4°', inscriptos_v: 18, inscriptos_m: 8, orientation_code: 'CB', cycle: 'basico' as const },
+    { year: 2, division: 4, display_name: '2° 4°', inscriptos_v: 18, inscriptos_m: 11, orientation_code: 'CB', cycle: 'basico' as const },
+    { year: 3, division: 1, display_name: '3° 1°', inscriptos_v: 17, inscriptos_m: 11, orientation_code: 'CB', cycle: 'basico' as const },
+    { year: 4, division: 1, display_name: '4° 1°', inscriptos_v: 9, inscriptos_m: 20, orientation_code: 'TECQU', cycle: 'superior' as const },
+    { year: 4, division: 2, display_name: '4° 2°', inscriptos_v: 17, inscriptos_m: 14, orientation_code: 'TECMM', cycle: 'superior' as const },
+    { year: 4, division: 3, display_name: '4° 3°', inscriptos_v: 28, inscriptos_m: 7, orientation_code: 'TECET', cycle: 'superior' as const },
+    { year: 5, division: 1, display_name: '5° 1°', inscriptos_v: 7, inscriptos_m: 18, orientation_code: 'TECQU', cycle: 'superior' as const },
+    { year: 5, division: 2, display_name: '5° 2°', inscriptos_v: 10, inscriptos_m: 11, orientation_code: 'TECMM', cycle: 'superior' as const },
+    { year: 5, division: 3, display_name: '5° 3°', inscriptos_v: 22, inscriptos_m: 10, orientation_code: 'TECET', cycle: 'superior' as const },
+  ];
+
+  const handleSeedTurnoTardeOficial = async () => {
+    let tardeShift = shifts.find(s => s.name?.toLowerCase().includes('tarde'));
+    if (!tardeShift && shifts.length > 1) {
+      tardeShift = shifts[1];
+    }
+
+    if (!tardeShift) {
+      showMessage('No se encontró el Turno Tarde en el sistema.', 'error');
+      return;
+    }
+
+    if (!confirm(`¿Desea cargar los 10 cursos oficiales en Turno ${tardeShift.name} con las matrículas de alumnos (16V+11M en 1°3°, 9V+20M en 4°1°, etc.)?`)) {
+      return;
+    }
+
+    setSeedingBasico(true);
+    try {
+      const getOrientationId = async (code: string, fallbackName: string) => {
+        let found = orientations.find(o => o.code === code);
+        if (!found) {
+          const { data: created } = await supabase
+            .from('orientations')
+            .insert({ code, full_name: fallbackName })
+            .select('id')
+            .single();
+          if (created) return created.id;
+        }
+        return found?.id || orientations[0]?.id;
+      };
+
+      const cbId = await getOrientationId('CB', 'Ciclo Básico');
+      const tecquId = await getOrientationId('TECQU', 'Técnico en Química');
+      const tecmmId = await getOrientationId('TECMM', 'Técnico en Electromecánica');
+      const tecetId = await getOrientationId('TECET', 'Técnico en Electrónica');
+
+      const orientationMap: Record<string, string> = {
+        CB: cbId,
+        TECQU: tecquId,
+        TECMM: tecmmId,
+        TECET: tecetId
+      };
+
+      let count = 0;
+      for (const c of OFFICIAL_TARDE_COURSES) {
+        const inscriptos_t = c.inscriptos_v + c.inscriptos_m;
+        const orientationId = orientationMap[c.orientation_code] || cbId;
+
+        const existing = courses.find(
+          item => item.shift_id === tardeShift?.id && 
+          (item.display_name === c.display_name || (item.year === c.year && item.division === c.division))
+        );
+
+        if (existing) {
+          const { error: updErr } = await supabase
+            .from('courses')
+            .update({
+              display_name: c.display_name,
+              orientation_id: orientationId,
+              inscriptos_v: c.inscriptos_v,
+              inscriptos_m: c.inscriptos_m,
+              inscriptos_t,
+              cycle: c.cycle,
+              is_active: true
+            })
+            .eq('id', existing.id);
+          if (!updErr) count++;
+        } else {
+          const { error: insErr } = await supabase
+            .from('courses')
+            .insert({
+              shift_id: tardeShift.id,
+              year: c.year,
+              division: c.division,
+              display_name: c.display_name,
+              orientation_id: orientationId,
+              inscriptos_v: c.inscriptos_v,
+              inscriptos_m: c.inscriptos_m,
+              inscriptos_t,
+              cycle: c.cycle,
+              is_active: true
+            });
+          if (!insErr) count++;
+        }
+      }
+
+      showMessage(`Se cargaron/actualizaron exitosamente los ${count} cursos oficiales de Turno Tarde`, 'success');
+      setCourseShiftFilter(tardeShift.id);
+      fetchData();
+    } catch (e: any) {
+      showMessage(e.message || 'Error al cargar cursos oficiales de Turno Tarde', 'error');
+    } finally {
+      setSeedingBasico(false);
+    }
+  };
+
   const handleSaveCourse = async () => {
     if (!courseForm.shift_id || !courseForm.orientation_id || !courseForm.display_name) {
       showMessage('Complete el turno, la orientación y el nombre del curso', 'error');
@@ -818,6 +927,15 @@ const AdminPanel = () => {
                 >
                   <Sparkles className="w-4 h-4 mr-1.5 text-emerald-100" />
                   {seedingBasico ? 'Cargando...' : 'Cargar Turno Mañana (10 Cursos Oficiales)'}
+                </button>
+                <button
+                  onClick={handleSeedTurnoTardeOficial}
+                  disabled={seedingBasico}
+                  title="Carga los 10 cursos oficiales de Turno Tarde con sus matrículas de alumnos (1°3°, 1°4°, 2°4°, 3°1°, 4°1° a 4°3°, 5°1° a 5°3°)"
+                  className="inline-flex items-center px-3.5 py-2 bg-amber-600 border border-amber-700 text-white rounded-lg hover:bg-amber-700 font-medium text-sm shadow-sm transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 mr-1.5 text-amber-100" />
+                  {seedingBasico ? 'Cargando...' : 'Cargar Turno Tarde (10 Cursos Oficiales)'}
                 </button>
                 <button
                   onClick={handleSeedCicloBasico}

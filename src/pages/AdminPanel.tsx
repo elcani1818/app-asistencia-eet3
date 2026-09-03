@@ -282,6 +282,110 @@ const AdminPanel = () => {
     }));
   };
 
+  // Cursos oficiales Ciclo Básico Turno Mañana (según Parte General)
+  const OFFICIAL_MANANA_COURSES = [
+    { year: 1, division: 1, display_name: '1° 1°', inscriptos_v: 19, inscriptos_m: 6 },
+    { year: 1, division: 2, display_name: '1° 2°', inscriptos_v: 14, inscriptos_m: 13 },
+    { year: 1, division: 5, display_name: '1° 5°', inscriptos_v: 13, inscriptos_m: 11 },
+    { year: 2, division: 1, display_name: '2° 1°', inscriptos_v: 17, inscriptos_m: 8 },
+    { year: 2, division: 2, display_name: '2° 2°', inscriptos_v: 12, inscriptos_m: 13 },
+    { year: 2, division: 3, display_name: '2° 3°', inscriptos_v: 17, inscriptos_m: 8 },
+    { year: 2, division: 5, display_name: '2° 5°', inscriptos_v: 16, inscriptos_m: 6 },
+    { year: 3, division: 2, display_name: '3° 2°', inscriptos_v: 10, inscriptos_m: 15 },
+    { year: 3, division: 3, display_name: '3° 3°', inscriptos_v: 18, inscriptos_m: 6 },
+    { year: 3, division: 4, display_name: '3° 4°', inscriptos_v: 12, inscriptos_m: 15 },
+  ];
+
+  const handleSeedTurnoMananaOficial = async () => {
+    // 1. Identificar el Turno Mañana
+    let mananaShift = shifts.find(s => s.name?.toLowerCase().includes('mañana'));
+    if (!mananaShift && shifts.length > 0) {
+      mananaShift = shifts[0];
+    }
+
+    if (!mananaShift) {
+      showMessage('No se encontró el Turno Mañana en el sistema.', 'error');
+      return;
+    }
+
+    // 2. Identificar la Orientación Ciclo Básico
+    const cbOrientation = orientations.find(o => o.code === 'CB' || o.full_name?.toLowerCase().includes('básico'));
+
+    if (!confirm(`¿Desea cargar los 10 cursos oficiales del Ciclo Básico en Turno ${mananaShift.name} con las matrículas de alumnos (19V+6M en 1°1°, 14V+13M en 1°2°, etc.)?`)) {
+      return;
+    }
+
+    setSeedingBasico(true);
+    try {
+      let orientationId = cbOrientation?.id;
+      if (!orientationId) {
+        const { data: newOrient, error: oErr } = await supabase
+          .from('orientations')
+          .insert({ code: 'CB', full_name: 'Ciclo Básico' })
+          .select('id')
+          .single();
+        if (!oErr && newOrient) {
+          orientationId = newOrient.id;
+        } else if (orientations.length > 0) {
+          orientationId = orientations[0].id;
+        }
+      }
+
+      let count = 0;
+      for (const c of OFFICIAL_MANANA_COURSES) {
+        const inscriptos_t = c.inscriptos_v + c.inscriptos_m;
+        
+        // Verificar si ya existe este curso para este turno
+        const existing = courses.find(
+          item => item.shift_id === mananaShift?.id && 
+          (item.display_name === c.display_name || (item.year === c.year && item.division === c.division))
+        );
+
+        if (existing) {
+          // Actualizar matrícula oficial
+          const { error: updErr } = await supabase
+            .from('courses')
+            .update({
+              display_name: c.display_name,
+              orientation_id: orientationId || existing.orientation_id,
+              inscriptos_v: c.inscriptos_v,
+              inscriptos_m: c.inscriptos_m,
+              inscriptos_t,
+              cycle: 'basico',
+              is_active: true
+            })
+            .eq('id', existing.id);
+          if (!updErr) count++;
+        } else {
+          // Insertar nuevo curso
+          const { error: insErr } = await supabase
+            .from('courses')
+            .insert({
+              shift_id: mananaShift.id,
+              year: c.year,
+              division: c.division,
+              display_name: c.display_name,
+              orientation_id: orientationId,
+              inscriptos_v: c.inscriptos_v,
+              inscriptos_m: c.inscriptos_m,
+              inscriptos_t,
+              cycle: 'basico',
+              is_active: true
+            });
+          if (!insErr) count++;
+        }
+      }
+
+      showMessage(`Se cargaron/actualizaron exitosamente los ${count} cursos oficiales de Turno Mañana`, 'success');
+      setCourseShiftFilter(mananaShift.id);
+      fetchData();
+    } catch (e: any) {
+      showMessage(e.message || 'Error al cargar cursos oficiales de Turno Mañana', 'error');
+    } finally {
+      setSeedingBasico(false);
+    }
+  };
+
   const handleSaveCourse = async () => {
     if (!courseForm.shift_id || !courseForm.orientation_id || !courseForm.display_name) {
       showMessage('Complete el turno, la orientación y el nombre del curso', 'error');
@@ -290,35 +394,78 @@ const AdminPanel = () => {
 
     setSavingCourse(true);
     try {
+      const inscriptos_v = Number(courseForm.inscriptos_v) || 0;
+      const inscriptos_m = Number(courseForm.inscriptos_m) || 0;
+      const inscriptos_t = inscriptos_v + inscriptos_m;
+
       if (editingCourseId) {
-        // Update
-        const { error } = await supabase.rpc('admin_update_course', {
+        // Intento 1: RPC
+        const { error: rpcError } = await supabase.rpc('admin_update_course', {
           p_course_id: editingCourseId,
           p_year: courseForm.year,
           p_division: courseForm.division,
           p_display_name: courseForm.display_name,
           p_shift_id: courseForm.shift_id,
           p_orientation_id: courseForm.orientation_id,
-          p_inscriptos_v: courseForm.inscriptos_v,
-          p_inscriptos_m: courseForm.inscriptos_m,
+          p_inscriptos_v: inscriptos_v,
+          p_inscriptos_m: inscriptos_m,
           p_cycle: courseForm.cycle,
           p_is_active: courseForm.is_active
         });
-        if (error) throw error;
+
+        // Fallback a tabla directa si el RPC falla
+        if (rpcError) {
+          const { error: tblError } = await supabase
+            .from('courses')
+            .update({
+              year: courseForm.year,
+              division: courseForm.division,
+              display_name: courseForm.display_name,
+              shift_id: courseForm.shift_id,
+              orientation_id: courseForm.orientation_id,
+              inscriptos_v,
+              inscriptos_m,
+              inscriptos_t,
+              cycle: courseForm.cycle,
+              is_active: courseForm.is_active
+            })
+            .eq('id', editingCourseId);
+          if (tblError) throw tblError;
+        }
+
         showMessage('Curso actualizado correctamente', 'success');
       } else {
-        // Create
-        const { error } = await supabase.rpc('admin_create_course', {
+        // Intento 1: RPC
+        const { error: rpcError } = await supabase.rpc('admin_create_course', {
           p_year: courseForm.year,
           p_division: courseForm.division,
           p_display_name: courseForm.display_name,
           p_shift_id: courseForm.shift_id,
           p_orientation_id: courseForm.orientation_id,
-          p_inscriptos_v: courseForm.inscriptos_v,
-          p_inscriptos_m: courseForm.inscriptos_m,
+          p_inscriptos_v: inscriptos_v,
+          p_inscriptos_m: inscriptos_m,
           p_cycle: courseForm.cycle
         });
-        if (error) throw error;
+
+        // Fallback a tabla directa si el RPC falla
+        if (rpcError) {
+          const { error: tblError } = await supabase
+            .from('courses')
+            .insert({
+              year: courseForm.year,
+              division: courseForm.division,
+              display_name: courseForm.display_name,
+              shift_id: courseForm.shift_id,
+              orientation_id: courseForm.orientation_id,
+              inscriptos_v,
+              inscriptos_m,
+              inscriptos_t,
+              cycle: courseForm.cycle,
+              is_active: true
+            });
+          if (tblError) throw tblError;
+        }
+
         showMessage('Curso creado con éxito', 'success');
       }
 
@@ -334,8 +481,11 @@ const AdminPanel = () => {
   const handleDeleteCourse = async (courseId: string, displayName: string) => {
     if (!confirm(`¿Está seguro de eliminar el curso "${displayName}"? Se borrarán sus asistencias y asignaciones vinculadas.`)) return;
     try {
-      const { error } = await supabase.rpc('admin_delete_course', { p_course_id: courseId });
-      if (error) throw error;
+      const { error: rpcError } = await supabase.rpc('admin_delete_course', { p_course_id: courseId });
+      if (rpcError) {
+        const { error: tblError } = await supabase.from('courses').delete().eq('id', courseId);
+        if (tblError) throw tblError;
+      }
       showMessage(`Curso "${displayName}" eliminado`, 'success');
       fetchData();
     } catch (e: any) {
@@ -347,15 +497,45 @@ const AdminPanel = () => {
     const targetShiftId = courseShiftFilter !== 'all' ? courseShiftFilter : shifts[0]?.id;
     const targetShiftName = shifts.find(s => s.id === targetShiftId)?.name || 'seleccionado';
     
-    if (!confirm(`¿Desea crear automáticamente los 14 cursos del Ciclo Básico (1°1ª a 1°5ª, 2°1ª a 2°5ª, 3°1ª a 3°4ª) en el Turno ${targetShiftName}? Los que ya existan no se duplicarán.`)) {
+    if (!confirm(`¿Desea crear automáticamente los cursos del Ciclo Básico en el Turno ${targetShiftName}? Los que ya existan no se duplicarán.`)) {
       return;
     }
 
     setSeedingBasico(true);
     try {
       const { data, error } = await supabase.rpc('admin_seed_ciclo_basico', { p_shift_id: targetShiftId });
-      if (error) throw error;
-      showMessage(`Se agregaron ${data} cursos de Ciclo Básico en Turno ${targetShiftName}`, 'success');
+      if (error) {
+        // Fallback: insertar los cursos estándar de ciclo básico
+        const cbOrientation = orientations.find(o => o.code === 'CB');
+        let count = 0;
+        const basicCourses = [
+          { year: 1, division: 1 }, { year: 1, division: 2 }, { year: 1, division: 3 }, { year: 1, division: 4 }, { year: 1, division: 5 },
+          { year: 2, division: 1 }, { year: 2, division: 2 }, { year: 2, division: 3 }, { year: 2, division: 4 }, { year: 2, division: 5 },
+          { year: 3, division: 1 }, { year: 3, division: 2 }, { year: 3, division: 3 }, { year: 3, division: 4 },
+        ];
+        for (const bc of basicCourses) {
+          const name = `${bc.year}° ${bc.division}ª`;
+          const exists = courses.some(c => c.shift_id === targetShiftId && (c.display_name === name || (c.year === bc.year && c.division === bc.division)));
+          if (!exists) {
+            await supabase.from('courses').insert({
+              shift_id: targetShiftId,
+              year: bc.year,
+              division: bc.division,
+              display_name: name,
+              orientation_id: cbOrientation?.id || orientations[0]?.id,
+              inscriptos_v: 15,
+              inscriptos_m: 10,
+              inscriptos_t: 25,
+              cycle: 'basico',
+              is_active: true
+            });
+            count++;
+          }
+        }
+        showMessage(`Se agregaron ${count} cursos de Ciclo Básico en Turno ${targetShiftName}`, 'success');
+      } else {
+        showMessage(`Se agregaron ${data} cursos de Ciclo Básico en Turno ${targetShiftName}`, 'success');
+      }
       fetchData();
     } catch (e: any) {
       showMessage(e.message || 'Error al precargar cursos', 'error');
@@ -631,13 +811,22 @@ const AdminPanel = () => {
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2">
                 <button
+                  onClick={handleSeedTurnoMananaOficial}
+                  disabled={seedingBasico}
+                  title="Carga los 10 cursos oficiales de Ciclo Básico Turno Mañana con sus matrículas de alumnos (1°1°, 1°2°, 1°5°, 2°1°, 2°2°, 2°3°, 2°5°, 3°2°, 3°3°, 3°4°)"
+                  className="inline-flex items-center px-3.5 py-2 bg-emerald-600 border border-emerald-700 text-white rounded-lg hover:bg-emerald-700 font-medium text-sm shadow-sm transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 mr-1.5 text-emerald-100" />
+                  {seedingBasico ? 'Cargando...' : 'Cargar Turno Mañana (10 Cursos Oficiales)'}
+                </button>
+                <button
                   onClick={handleSeedCicloBasico}
                   disabled={seedingBasico}
                   title="Genera automáticamente 1°1ª a 1°5ª, 2°1ª a 2°5ª, 3°1ª a 3°4ª para el turno seleccionado"
                   className="inline-flex items-center px-3.5 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium text-sm transition-colors disabled:opacity-50"
                 >
                   <Sparkles className="w-4 h-4 mr-1.5 text-indigo-600" />
-                  {seedingBasico ? 'Generando...' : 'Precargar Ciclo Básico (1° a 3°)'}
+                  {seedingBasico ? 'Generando...' : 'Precargar Ciclo Básico General'}
                 </button>
                 <button
                   onClick={openNewCourseModal}

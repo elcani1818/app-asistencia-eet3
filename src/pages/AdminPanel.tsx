@@ -333,8 +333,6 @@ const AdminPanel = () => {
 
       let count = 0;
       for (const c of OFFICIAL_MANANA_COURSES) {
-        const inscriptos_t = c.inscriptos_v + c.inscriptos_m;
-        
         // Verificar si ya existe este curso para este turno
         const existing = courses.find(
           item => item.shift_id === mananaShift?.id && 
@@ -350,7 +348,6 @@ const AdminPanel = () => {
               orientation_id: orientationId || existing.orientation_id,
               inscriptos_v: c.inscriptos_v,
               inscriptos_m: c.inscriptos_m,
-              inscriptos_t,
               cycle: 'basico',
               is_active: true
             })
@@ -368,7 +365,6 @@ const AdminPanel = () => {
               orientation_id: orientationId,
               inscriptos_v: c.inscriptos_v,
               inscriptos_m: c.inscriptos_m,
-              inscriptos_t,
               cycle: 'basico',
               is_active: true
             });
@@ -444,7 +440,6 @@ const AdminPanel = () => {
 
       let count = 0;
       for (const c of OFFICIAL_TARDE_COURSES) {
-        const inscriptos_t = c.inscriptos_v + c.inscriptos_m;
         const orientationId = orientationMap[c.orientation_code] || cbId;
 
         const existing = courses.find(
@@ -460,7 +455,6 @@ const AdminPanel = () => {
               orientation_id: orientationId,
               inscriptos_v: c.inscriptos_v,
               inscriptos_m: c.inscriptos_m,
-              inscriptos_t,
               cycle: c.cycle,
               is_active: true
             })
@@ -477,7 +471,6 @@ const AdminPanel = () => {
               orientation_id: orientationId,
               inscriptos_v: c.inscriptos_v,
               inscriptos_m: c.inscriptos_m,
-              inscriptos_t,
               cycle: c.cycle,
               is_active: true
             });
@@ -505,7 +498,6 @@ const AdminPanel = () => {
     try {
       const inscriptos_v = Number(courseForm.inscriptos_v) || 0;
       const inscriptos_m = Number(courseForm.inscriptos_m) || 0;
-      const inscriptos_t = inscriptos_v + inscriptos_m;
 
       if (editingCourseId) {
         // Intento 1: RPC
@@ -534,7 +526,6 @@ const AdminPanel = () => {
               orientation_id: courseForm.orientation_id,
               inscriptos_v,
               inscriptos_m,
-              inscriptos_t,
               cycle: courseForm.cycle,
               is_active: courseForm.is_active
             })
@@ -568,7 +559,6 @@ const AdminPanel = () => {
               orientation_id: courseForm.orientation_id,
               inscriptos_v,
               inscriptos_m,
-              inscriptos_t,
               cycle: courseForm.cycle,
               is_active: true
             });
@@ -634,7 +624,6 @@ const AdminPanel = () => {
               orientation_id: cbOrientation?.id || orientations[0]?.id,
               inscriptos_v: 15,
               inscriptos_m: 10,
-              inscriptos_t: 25,
               cycle: 'basico',
               is_active: true
             });
